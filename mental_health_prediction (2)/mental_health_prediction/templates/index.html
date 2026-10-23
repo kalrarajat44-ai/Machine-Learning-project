@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block title %}MindScan — Analyze Text{% endblock %}
+
+{% block head %}
+<style>
+/* ── Hero ── */
+.hero {
+    padding: 4rem 0 2.5rem;
+    text-align: center;
+}
+.hero-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+    color: #818cf8; padding: 5px 14px; border-radius: 20px;
+    font-size: .8rem; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; margin-bottom: 1.25rem;
+}
+.hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 700; line-height: 1.15;
+    letter-spacing: -.02em; margin-bottom: .75rem;
+    background: linear-gradient(135deg, #f1f5f9 30%, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.hero p {
+    color: var(--muted); font-size: 1.05rem; max-width: 560px; margin: 0 auto 2rem;
+}
+
+/* ── Stats Row ── */
+.stats-row {
+    display: flex; justify-content: center; gap: 2.5rem;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+}
+.stat-item { text-align: center; }
+.stat-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.5rem; font-weight: 600; color: var(--accent2);
+    display: block;
+}
+.stat-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+/* ── Input Area ── */
+.analyze-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    margin-bottom: 2rem;
+}
+.analyze-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.analyze-header-left {
+    display: flex; align-items: center; gap: 8px;
+    font-size: .85rem; font-weight: 600; color: var(--muted);
+}
+.dot-red   { width:10px; height:10px; border-radius:50%; background:#ef4444; }
+.dot-yellow{ width:10px; height:10px; border-radius:50%; background:#f59e0b; }
+.dot-green { width:10px; height:10px; border-radius:50%; background:#10b981; }
+.char-counter { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--muted); }
+
+#textInput {
+    width: 100%; min-height: 180px;
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 1rem; line-height: 1.7; resize: vertical;
+    padding: 1.25rem 1.5rem;
+}
+#textInput::placeholder { color: #334155; }
+
+.analyze-footer {
+    padding: .75rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: .75rem;
+}
+.sample-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.sample-btn {
+    padding: 4px 12px; border-radius: 20px; font-size: .75rem;
+    font-weight: 500; border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+    cursor: pointer; transition: all .2s;
+}
+.sample-btn:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* ── Results ── */
+#resultsSection { display: none; }
+
+.result-header {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1.5rem; border-radius: 14px;
+    margin-bottom: 1.5rem; border: 1px solid;
+    position: relative; overflow: hidden;
+}
+.result-header::before {
+    content: ''; position: absolute; inset: 0;
+    opacity: .06;
+    background: currentColor;
+}
+.result-icon { font-size: 2.5rem; }
+.result-label { font-size: 1.5rem; font-weight: 700; }
+.result-conf { font-family: 'DM Mono', monospace; font-size: .85rem; color: var(--muted); }
+.result-desc { font-size: .9rem; margin-top: .25rem; }
+
+/* ── Tips ── */
+.tips-list { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+.tips-list li {
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: .88rem; color: var(--text);
+}
+.tips-list li::before {
+    content: '✓';
+    min-width: 20px; height: 20px;
+    background: rgba(16,185,129,.15); color: #10b981;
+    border-radius: 50%; font-size: .7rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+}
+
+/* ── Proba bars ── */
+.prob-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: .6rem; font-size: .85rem;
+}
+.prob-label { width: 90px; color: var(--muted); flex-shrink: 0; }
+.prob-bar-bg {
+    flex: 1; height: 8px; border-radius: 4px;
+    background: rgba(255,255,255,.06); overflow: hidden;
+}
+.prob-bar-fill {
+    height: 100%; border-radius: 4px;
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+}
+.prob-pct { width: 46px; text-align: right; font-family: 'DM Mono', monospace; font-size: .8rem; }
+
+/* ── Model pills ── */
+.model-grid { display: flex; flex-direction: column; gap: .6rem; }
+.model-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .6rem .9rem; border-radius: 8px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--border);
+    font-size: .85rem;
+}
+.model-name { color: var(--muted); }
+.model-pred {
+    font-weight: 600; padding: 2px 10px; border-radius: 12px;
+    font-size: .78rem;
+}
+
+/* ── Sentiment ── */
+.sent-row {
+    display: flex; gap: 1rem; margin-top: .75rem;
+    justify-content: space-around; text-align: center;
+}
+.sent-item .sent-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.3rem; font-weight: 600;
+}
+.sent-item .sent-key { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── Chart img ── */
+.chart-img { width: 100%; border-radius: 8px; display: block; }
+
+/* ── Loading ── */
+.spinner {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 3px solid rgba(99,102,241,.2);
+    border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-box {
+    display: none; justify-content: center; align-items: center;
+    gap: 12px; padding: 2rem;
+    color: var(--muted); font-size: .9rem;
+}
+
+.disclaimer {
+    background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.2);
+    border-radius: 10px; padding: .9rem 1.1rem;
+    font-size: .8rem; color: #d97706;
+    display: flex; gap: 8px; align-items: flex-start;
+}
+
+/* Fade-in animation */
+@keyframes fadeUp {
+    from { opacity:0; transform: translateY(16px); }
+    to   { opacity:1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp .4s ease forwards; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container page">
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-tag">🔬 NLP + Machine Learning</div>
+        <h1>Mental Health Prediction<br>from Social Media Text</h1>
+        <p>Enter any social media post or personal text. Our trained ML models analyze linguistic patterns and sentiment to predict mental health indicators.</p>
+
+        <div class="stats-row">
+            <div class="stat-item"><span class="stat-num">4</span><span class="stat-label">Conditions</span></div>
+            <div class="stat-item"><span class="stat-num">3+</span><span class="stat-label">ML Models</span></div>
+            <div class="stat-item"><span class="stat-num">TF-IDF</span><span class="stat-label">Feature Extraction</span></div>
+            <div class="stat-item"><span class="stat-num">NLP</span><span class="stat-label">Powered</span></div>
+        </div>
+    </div>
+
+    <!-- Input Card -->
+    <div class="analyze-card">
+        <div class="analyze-header">
+            <div class="analyze-header-left">
+                <div class="dot-red"></div><div class="dot-yellow"></div><div class="dot-green"></div>
+                &nbsp; Text Input
+            </div>
+            <span class="char-counter" id="charCount">0 chars</span>
+        </div>
+        <textarea id="textInput" placeholder="Type or paste social media text here…&#10;&#10;E.g. 'I have been feeling really overwhelmed lately. Work pressure is building up and I can't seem to find any time to relax...'"></textarea>
+        <div class="analyze-footer">
+            <div class="sample-btns">
+                <span style="font-size:.75rem;color:var(--muted);align-self:center">Try sample:</span>
+                <button class="sample-btn" data-sample="normal">😊 Normal</button>
+                <button class="sample-btn" data-sample="stress">😤 Stress</button>
+                <button class="sample-btn" data-sample="anxiety">😰 Anxiety</button>
+                <button class="sample-btn" data-sample="depression">😔 Depression</button>
+            </div>
+            <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+                Analyze Text
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-box" id="loadingBox">
+        <div class="spinner"></div>
+        <span>Analyzing text with NLP pipeline…</span>
+    </div>
+
+    <!-- Error -->
+    <div id="errorBox" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:1rem 1.25rem;color:#f87171;font-size:.9rem;margin-bottom:1.5rem;"></div>
+
+    <!-- Results -->
+    <div id="resultsSection">
+
+        <!-- Main prediction -->
+        <div id="resultHeader" class="result-header fade-up">
+            <div class="result-icon" id="rIcon"></div>
+            <div>
+                <div class="result-label" id="rLabel"></div>
+                <div class="result-conf" id="rConf"></div>
+                <div class="result-desc" id="rDesc"></div>
+            </div>
+        </div>
+
+        <!-- Grid row 1 -->
+        <div class="grid-2" style="margin-bottom:1.25rem;">
+            <!-- Probability chart -->
+            <div class="card">
+                <div class="card-title"><span class="dot"></span>Probability Distribution</div>
+                <div id="probBars"></div>
+            </div>
+            <!-- Tips -->
+            <div class="card">
+                <div class="card-title"><span class="dot" style="background:#10b981"></span>Recommendations</div>
+                <ul class="tips-list" id="tipsList"></ul>
+            </div>
+        </div>
+
+        <!-- Grid row 2 -->
+        <div class="grid-3" style="margin-bottom:1.25rem;">
+            <!-- Sentiment -->
+            <div class="card">
+                <div class="card-title"><span class="dot" style="background:#f59e0b"></span>Sentiment Analysis</div>
+                <div id="sentLabel" style="font-size:1.1rem;font-weight:600;margin-bottom:.5rem;"></div>
+                <div class="sent-row" id="sentRow"></div>
+            </div>
+            <!-- Individual models -->
+            <div class="card" style="grid-column: span 2;">
+                <div class="card-title"><span class="dot" style="background:#ef4444"></span>Individual Model Predictions</div>
+                <div class="model-grid" id="modelGrid"></div>
+            </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="grid-2" style="margin-bottom:1.25rem;">
+            <div class="card">
+                <div class="card-title"><span class="dot"></span>Probability Chart</div>
+                <img id="probChart" class="chart-img" src="" alt="Probability Chart">
+            </div>
+            <div class="card">
+                <div class="card-title"><span class="dot" style="background:#f59e0b"></span>Sentiment Chart</div>
+                <img id="sentChart" class="chart-img" src="" alt="Sentiment Chart">
+            </div>
+        </div>
+
+        <!-- Cleaned Text -->
+        <div class="card" style="margin-bottom:1.25rem;">
+            <div class="card-title"><span class="dot" style="background:#64748b"></span>Pre-processed Text (After NLP Pipeline)</div>
+            <p id="cleanedText" class="font-mono" style="font-size:.82rem;color:var(--muted);line-height:1.8;word-break:break-word;"></p>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="disclaimer">
+            ⚠️ <span>This prediction is for <strong>research and educational purposes only</strong>. It is not a clinical diagnosis. If you are experiencing mental health challenges, please consult a qualified mental health professional.</span>
+        </div>
+    </div>
+</div>
+
+<script>
+const SAMPLES = {
+    normal:     "Had such a wonderful day today! Caught up with old friends over lunch, went for a walk in the park, and finished a book I've been reading for months. Feeling really grateful and content with life right now. Looking forward to tomorrow!",
+    stress:     "I have three major deadlines this week and my manager just added two more tasks on top of everything. I haven't slept properly in days. The financial pressure is unreal and I feel completely overwhelmed. I don't know how I'm going to get through all of this.",
+    anxiety:    "I keep worrying about everything that could go wrong. My heart races whenever my phone rings. I cancelled meeting my friends again because I just couldn't face being around people. I've been obsessively checking things and I know it's irrational but I just can't stop my mind from spiraling.",
+    depression: "I've lost interest in everything I used to enjoy. Even getting out of bed feels like a huge effort. I feel completely empty inside, like nothing matters anymore. I've been pulling away from everyone because I don't want to be a burden. The days just blur together."
+};
+
+const LABEL_COLORS = {
+    Depression: '#6366f1',
+    Anxiety:    '#f59e0b',
+    Stress:     '#ef4444',
+    Normal:     '#10b981'
+};
+
+// Sample buttons
+document.querySelectorAll('.sample-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('textInput').value = SAMPLES[btn.dataset.sample];
+        updateCount();
+    });
+});
+
+// Char counter
+const inp = document.getElementById('textInput');
+function updateCount() {
+    const n = inp.value.length;
+    document.getElementById('charCount').textContent = n + ' chars';
+}
+inp.addEventListener('input', updateCount);
+
+async function analyze() {
+    const text = inp.value.trim();
+    if (!text) { showError('Please enter some text to analyze.'); return; }
+
+    // Reset UI
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('errorBox').style.display = 'none';
+    document.getElementById('loadingBox').style.display = 'flex';
+    document.getElementById('analyzeBtn').disabled = true;
+
+    try {
+        const res = await fetch('/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        document.getElementById('loadingBox').style.display = 'none';
+        document.getElementById('analyzeBtn').disabled = false;
+
+        if (!res.ok || data.error) { showError(data.error || 'Unknown error.'); return; }
+        renderResults(data);
+    } catch (e) {
+        document.getElementById('loadingBox').style.display = 'none';
+        document.getElementById('analyzeBtn').disabled = false;
+        showError('Network error. Please try again.');
+    }
+}
+
+function showError(msg) {
+    const el = document.getElementById('errorBox');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+    document.getElementById('loadingBox').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = false;
+}
+
+function renderResults(d) {
+    const color = d.color;
+
+    // Header
+    const header = document.getElementById('resultHeader');
+    header.style.borderColor = color + '55';
+    header.style.color = color;
+    document.getElementById('rIcon').textContent = d.icon;
+    document.getElementById('rLabel').textContent = d.prediction;
+    document.getElementById('rConf').textContent = `Confidence: ${d.confidence.toFixed(1)}%  ·  Words: ${d.word_count}`;
+    document.getElementById('rDesc').style.color = '#94a3b8';
+    document.getElementById('rDesc').textContent = d.description;
+
+    // Probability bars
+    const pbEl = document.getElementById('probBars');
+    pbEl.innerHTML = '';
+    for (const [label, pct] of Object.entries(d.probabilities)) {
+        const c = LABEL_COLORS[label] || '#6366f1';
+        pbEl.innerHTML += `
+        <div class="prob-row">
+            <span class="prob-label">${label}</span>
+            <div class="prob-bar-bg">
+                <div class="prob-bar-fill" style="width:${pct}%;background:${c}"></div>
+            </div>
+            <span class="prob-pct" style="color:${c}">${pct}%</span>
+        </div>`;
+    }
+
+    // Tips
+    const tipsEl = document.getElementById('tipsList');
+    tipsEl.innerHTML = d.tips.map(t => `<li>${t}</li>`).join('');
+
+    // Sentiment
+    const s = d.sentiment;
+    document.getElementById('sentLabel').innerHTML =
+        `<span style="color:${s.label==='Positive'?'#10b981':s.label==='Negative'?'#ef4444':'#64748b'}">${s.label}</span>`;
+    document.getElementById('sentRow').innerHTML = `
+        <div class="sent-item"><div class="sent-val" style="color:#10b981">${(s.positive*100).toFixed(0)}%</div><div class="sent-key">Positive</div></div>
+        <div class="sent-item"><div class="sent-val" style="color:#ef4444">${(s.negative*100).toFixed(0)}%</div><div class="sent-key">Negative</div></div>
+        <div class="sent-item"><div class="sent-val" style="color:#64748b">${(s.neutral*100).toFixed(0)}%</div><div class="sent-key">Neutral</div></div>`;
+
+    // Individual models
+    const mg = document.getElementById('modelGrid');
+    mg.innerHTML = '';
+    for (const [name, pred] of Object.entries(d.individual_predictions)) {
+        const c = LABEL_COLORS[pred] || '#6366f1';
+        mg.innerHTML += `
+        <div class="model-row">
+            <span class="model-name">${name}</span>
+            <span class="model-pred" style="background:${c}22;color:${c}">${pred}</span>
+        </div>`;
+    }
+
+    // Charts
+    document.getElementById('probChart').src = 'data:image/png;base64,' + d.prob_chart;
+    document.getElementById('sentChart').src = 'data:image/png;base64,' + d.sentiment_chart;
+
+    // Cleaned text
+    document.getElementById('cleanedText').textContent = d.cleaned_text || '(text too short to extract keywords)';
+
+    document.getElementById('resultsSection').style.display = 'block';
+    document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+{% endblock %}
